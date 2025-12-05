@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
 namespace BalzorWbs.Models;
 
 public class WbsTask
@@ -6,18 +10,23 @@ public class WbsTask
 
     public string Title { get; set; } = string.Empty;
 
-    public decimal Charge 
+    private decimal _charge;
+    private decimal _consumed;
+    private decimal _raf;
+
+    public decimal Charge
     {
         get => _charge;
         set => _charge = Math.Max(0, value);
     }
-
-    public decimal Consumed {
+        
+    public decimal Consumed
+    {
         get => _consumed;
         set => _consumed = Math.Max(0, value);
     }
 
-    public decimal Raf { get; set; }
+    public decimal Raf
     {
         get => _raf;
         set => _raf = Math.Max(0, value);
@@ -27,9 +36,7 @@ public class WbsTask
 
     public List<WbsTask> Children { get; set; } = new();
 
-    private decimal _charge;
-    private decimal _consumed;
-    private decimal _raf;
+   
 
     public bool IsLeaf => Children.Count == 0;
 
