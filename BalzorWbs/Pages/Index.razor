@@ -1,0 +1,376 @@
+@page "/"
+@inject IProjectService ProjectService
+
+<PageTitle>WBS</PageTitle>
+
+<h1 class="mb-4">Création de WBS</h1>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <label class="form-label">Projet</label>
+        <select class="form-select" @onchange="OnProjectSelected">
+            <option value="">-- Sélectionner --</option>
+            @foreach (var project in _projects)
+            {
+                <option value="@project.Id" selected="@(_currentProject?.Id == project.Id)">@project.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Créer un projet</label>
+        <div class="input-group">
+            <input class="form-control" placeholder="Nom du projet" @bind="_newProjectName" />
+            <button class="btn btn-primary" @onclick="CreateProject">Créer</button>
+        </div>
+    </div>
+    <div class="col-md-4 d-flex align-items-end gap-2">
+        <button class="btn btn-success" @onclick="SaveProject" disabled="@(_currentProject is null)">Enregistrer</button>
+        <button class="btn btn-danger" @onclick="DeleteCurrent" disabled="@(_currentProject is null)">Supprimer</button>
+        <button class="btn btn-secondary" @onclick="LoadProjects">Actualiser</button>
+    </div>
+</div>
+
+@if (_currentProject is not null)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Vue d'ensemble du projet</h5>
+            <div class="row text-center">
+                <div class="col">
+                    <div class="fw-bold">Charge</div>
+                    <div>@_currentProject.TotalCharge</div>
+                </div>
+                <div class="col">
+                    <div class="fw-bold">Consommé</div>
+                    <div>@_currentProject.TotalConsumed</div>
+                </div>
+                <div class="col">
+                    <div class="fw-bold">RAF</div>
+                    <div>@_currentProject.TotalRaf</div>
+                </div>
+                <div class="col">
+                    <div class="fw-bold">Consommation %</div>
+                    <div>@_currentProject.ConsumptionPercent %</div>
+                </div>
+                <div class="col">
+                    <div class="fw-bold">Avance/Retard %</div>
+                    <div>@_currentProject.AdvancePercent %</div>
+                </div>
+                <div class="col">
+                    <div class="fw-bold">Livraison</div>
+                    <div>@_currentProject.LatestDelivery.ToShortDateString()</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4>WBS</h4>
+        <button class="btn btn-outline-primary" @onclick="AddRootTask">Ajouter une tâche racine</button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped wbs-table">
+            <thead class="table-light">
+                <tr>
+                    <th>Tâche</th>
+                    <th class="text-end">Charge</th>
+                    <th class="text-end">Consommé</th>
+                    <th class="text-end">RAF</th>
+                    <th class="text-end">Consommation %</th>
+                    <th class="text-end">Avance/Retard %</th>
+                    <th class="text-end">Date de livraison</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var node in FlattenTasks())
+                {
+                    var task = node.Task;
+                    var indentClass = $"indent-{Math.Min(node.Depth, 6)}";
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center @indentClass">
+                                <input class="form-control form-control-sm" @bind="task.Title" />
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            @if (task.IsLeaf)
+                            {
+                                <InputNumber class="form-control form-control-sm text-end" @bind-Value="task.Charge" step="0.5" />
+                            }
+                            else
+                            {
+                                <span>@task.TotalCharge</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            @if (task.IsLeaf)
+                            {
+                                <InputNumber class="form-control form-control-sm text-end" @bind-Value="task.Consumed" step="0.5" />
+                            }
+                            else
+                            {
+                                <span>@task.TotalConsumed</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            @if (task.IsLeaf)
+                            {
+                                <InputNumber class="form-control form-control-sm text-end" @bind-Value="task.Raf" step="0.5" />
+                            }
+                            else
+                            {
+                                <span>@task.TotalRaf</span>
+                            }
+                        </td>
+                        <td class="text-end">@task.ConsumptionPercent %</td>
+                        <td class="text-end">@task.AdvancePercent %</td>
+                        <td class="text-end">
+                            @if (task.IsLeaf)
+                            {
+                                <InputDate class="form-control form-control-sm" @bind-Value="task.DeliveryDate" />
+                            }
+                            else
+                            {
+                                <span>@task.LatestDelivery.ToShortDateString()</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button class="btn btn-outline-secondary" title="Monter" @onclick="() => MoveUp(node)">&#8593;</button>
+                                <button class="btn btn-outline-secondary" title="Descendre" @onclick="() => MoveDown(node)">&#8595;</button>
+                                <button class="btn btn-outline-secondary" title="Indenter" @onclick="() => Indent(node)">&#x21b3;</button>
+                                <button class="btn btn-outline-secondary" title="Désindenter" @onclick="() => Outdent(node)">&#x21b1;</button>
+                                <button class="btn btn-outline-secondary" title="Ajouter sous-tâche" @onclick="() => AddChild(task)">+</button>
+                                <button class="btn btn-outline-danger" title="Supprimer" @onclick="() => RemoveTask(node)">x</button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <div class="alert alert-info">Chargez ou créez un projet pour travailler sur le WBS.</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(_status))
+{
+    <div class="alert alert-secondary mt-3">@_status</div>
+}
+
+@code {
+    private List<WbsProject> _projects = new();
+    private WbsProject? _currentProject;
+    private string _newProjectName = string.Empty;
+    private string? _status;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProjects();
+    }
+
+    private async Task LoadProjects()
+    {
+        _projects = await ProjectService.GetProjectsAsync();
+        if (_currentProject is not null)
+        {
+            _currentProject = _projects.FirstOrDefault(p => p.Id == _currentProject.Id);
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnProjectSelected(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            _currentProject = await ProjectService.GetProjectAsync(id);
+        }
+        else
+        {
+            _currentProject = null;
+        }
+    }
+
+    private async Task CreateProject()
+    {
+        _currentProject = await ProjectService.CreateProjectAsync(_newProjectName);
+        _projects = await ProjectService.GetProjectsAsync();
+        _newProjectName = string.Empty;
+        _status = "Projet créé (stubs WebService).";
+    }
+
+    private async Task SaveProject()
+    {
+        if (_currentProject is not null)
+        {
+            await ProjectService.SaveProjectAsync(_currentProject);
+            _status = "WBS envoyé au WebService (stub).";
+        }
+    }
+
+    private async Task DeleteCurrent()
+    {
+        if (_currentProject is not null)
+        {
+            var removed = await ProjectService.DeleteProjectAsync(_currentProject.Id);
+            _currentProject = null;
+            if (removed)
+            {
+                _status = "Projet supprimé (stub).";
+                await LoadProjects();
+            }
+        }
+    }
+
+    private List<TaskNode> FlattenTasks()
+    {
+        var nodes = new List<TaskNode>();
+        if (_currentProject is null)
+        {
+            return nodes;
+        }
+
+        foreach (var task in _currentProject.RootTasks)
+        {
+            BuildNodes(task, null, 0, nodes);
+        }
+
+        return nodes;
+    }
+
+    private void BuildNodes(WbsTask task, WbsTask? parent, int depth, List<TaskNode> buffer)
+    {
+        buffer.Add(new TaskNode(task, parent, depth));
+        foreach (var child in task.Children)
+        {
+            BuildNodes(child, task, depth + 1, buffer);
+        }
+    }
+
+    private void AddRootTask()
+    {
+        _currentProject?.RootTasks.Add(new WbsTask { Title = "Nouvelle tâche" });
+    }
+
+    private void AddChild(WbsTask parent)
+    {
+        parent.Children.Add(new WbsTask { Title = "Sous-tâche" });
+    }
+
+    private void RemoveTask(TaskNode node)
+    {
+        if (_currentProject is null)
+        {
+            return;
+        }
+
+        var siblings = node.Parent?.Children ?? _currentProject.RootTasks;
+        siblings.Remove(node.Task);
+    }
+
+    private void MoveUp(TaskNode node)
+    {
+        if (_currentProject is null)
+        {
+            return;
+        }
+
+        var siblings = node.Parent?.Children ?? _currentProject.RootTasks;
+        var index = siblings.IndexOf(node.Task);
+        if (index > 0)
+        {
+            (siblings[index - 1], siblings[index]) = (siblings[index], siblings[index - 1]);
+        }
+    }
+
+    private void MoveDown(TaskNode node)
+    {
+        if (_currentProject is null)
+        {
+            return;
+        }
+
+        var siblings = node.Parent?.Children ?? _currentProject.RootTasks;
+        var index = siblings.IndexOf(node.Task);
+        if (index >= 0 && index < siblings.Count - 1)
+        {
+            (siblings[index + 1], siblings[index]) = (siblings[index], siblings[index + 1]);
+        }
+    }
+
+    private void Indent(TaskNode node)
+    {
+        if (_currentProject is null)
+        {
+            return;
+        }
+
+        var siblings = node.Parent?.Children ?? _currentProject.RootTasks;
+        var index = siblings.IndexOf(node.Task);
+        if (index <= 0)
+        {
+            return;
+        }
+
+        var newParent = siblings[index - 1];
+        siblings.RemoveAt(index);
+        newParent.Children.Add(node.Task);
+    }
+
+    private void Outdent(TaskNode node)
+    {
+        if (_currentProject is null || node.Parent is null)
+        {
+            return;
+        }
+
+        var parent = node.Parent;
+        var grandParent = FindParent(parent);
+        var currentSiblings = parent.Children;
+        var index = currentSiblings.IndexOf(node.Task);
+        if (index < 0)
+        {
+            return;
+        }
+
+        currentSiblings.RemoveAt(index);
+        var grandParentList = grandParent?.Children ?? _currentProject.RootTasks;
+        var parentIndex = grandParentList.IndexOf(parent);
+        grandParentList.Insert(parentIndex + 1, node.Task);
+    }
+
+    private WbsTask? FindParent(WbsTask target)
+    {
+        if (_currentProject is null)
+        {
+            return null;
+        }
+
+        return FindParentRecursive(_currentProject.RootTasks, target);
+    }
+
+    private WbsTask? FindParentRecursive(IEnumerable<WbsTask> tasks, WbsTask target)
+    {
+        foreach (var task in tasks)
+        {
+            if (task.Children.Contains(target))
+            {
+                return task;
+            }
+
+            var candidate = FindParentRecursive(task.Children, target);
+            if (candidate is not null)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private record TaskNode(WbsTask Task, WbsTask? Parent, int Depth);
+}
