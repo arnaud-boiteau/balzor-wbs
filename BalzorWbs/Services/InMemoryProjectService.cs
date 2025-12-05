@@ -105,7 +105,9 @@ public class InMemoryProjectService : IProjectService
             Consumed = task.Consumed,
             Raf = task.Raf,
             DeliveryDate = task.DeliveryDate,
-            Children = task.Children.Select(CloneTask).ToList()
+            Children = task.Children.Select(CloneTask).ToList(),
+            // preserve UI state so expand/collapse survives clones (load/save)
+            IsExpanded = task.IsExpanded
         };
     }
 }

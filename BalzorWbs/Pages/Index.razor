@@ -50,11 +50,11 @@
                 </div>
                 <div class="col">
                     <div class="fw-bold">Consommation %</div>
-                    <div>@_currentProject.ConsumptionPercent %</div>
+                    <div class="@PercentBgClass(_currentProject.ConsumptionPercent) d-inline-block px-2 py-1 rounded">@_currentProject.ConsumptionPercent %</div>
                 </div>
                 <div class="col">
                     <div class="fw-bold">Avance/Retard %</div>
-                    <div>@_currentProject.AdvancePercent %</div>
+                    <div class="@PercentBgClass(_currentProject.AdvancePercent) d-inline-block px-2 py-1 rounded">@_currentProject.AdvancePercent %</div>
                 </div>
                 <div class="col">
                     <div class="fw-bold">Livraison</div>
@@ -66,7 +66,11 @@
 
     <div class="d-flex justify-content-between align-items-center mb-2">
         <h4>WBS</h4>
-        <button class="btn btn-outline-primary" @onclick="AddRootTask">Ajouter une tâche racine</button>
+        <div class="btn-group">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetAllExpand(true)">Tout déplier</button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetAllExpand(false)">Tout plier</button>
+            <button class="btn btn-outline-primary" @onclick="AddRootTask">Ajouter une tâche racine</button>
+        </div>
     </div>
 
     <div class="table-responsive">
@@ -91,6 +95,24 @@
                     <tr>
                         <td>
                             <div class="d-flex align-items-center @indentClass">
+                                @if (!task.IsLeaf)
+                                {
+                                    <button class="btn btn-sm btn-link p-0 me-2" title="Déplier / plier" @onclick="() => Toggle(task)">
+                                        @if (task.IsExpanded)
+                                        {
+                                            <span aria-hidden="true">&#9660;</span>
+                                        }
+                                        else
+                                        {
+                                            <span aria-hidden="true">&#9658;</span>
+                                        }
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="me-3" style="width:1.25rem;display:inline-block;"></span>
+                                }
+
                                 <input class="form-control form-control-sm" @bind="task.Title" />
                             </div>
                         </td>
@@ -124,8 +146,12 @@
                                 <span>@task.TotalRaf</span>
                             }
                         </td>
-                        <td class="text-end">@task.ConsumptionPercent %</td>
-                        <td class="text-end">@task.AdvancePercent %</td>
+                        <td class="text-end">
+                            <div class="@PercentBgClass(task.ConsumptionPercent) d-inline-block px-2 py-1 rounded">@task.ConsumptionPercent %</div>
+                        </td>
+                        <td class="text-end">
+                            <div class="@PercentBgClass(task.AdvancePercent) d-inline-block px-2 py-1 rounded">@task.AdvancePercent %</div>
+                        </td>
                         <td class="text-end">
                             @if (task.IsLeaf)
                             {
@@ -245,9 +271,43 @@ else
     private void BuildNodes(WbsTask task, WbsTask? parent, int depth, List<TaskNode> buffer)
     {
         buffer.Add(new TaskNode(task, parent, depth));
+        // only traverse children when the node is expanded
+        if (task.IsExpanded)
+        {
+            foreach (var child in task.Children)
+            {
+                BuildNodes(child, task, depth + 1, buffer);
+            }
+        }
+    }
+
+    private void Toggle(WbsTask task)
+    {
+        task.IsExpanded = !task.IsExpanded;
+        StateHasChanged();
+    }
+
+    private void SetAllExpand(bool expand)
+    {
+        if (_currentProject is null)
+        {
+            return;
+        }
+
+        foreach (var root in _currentProject.RootTasks)
+        {
+            SetExpandRecursive(root, expand);
+        }
+
+        StateHasChanged();
+    }
+
+    private void SetExpandRecursive(WbsTask task, bool expand)
+    {
+        task.IsExpanded = expand;
         foreach (var child in task.Children)
         {
-            BuildNodes(child, task, depth + 1, buffer);
+            SetExpandRecursive(child, expand);
         }
     }
 
@@ -258,6 +318,8 @@ else
 
     private void AddChild(WbsTask parent)
     {
+        // when adding a child, make sure parent is expanded so user sees the new node
+        parent.IsExpanded = true;
         parent.Children.Add(new WbsTask { Title = "Sous-tâche" });
     }
 
@@ -319,6 +381,8 @@ else
         var newParent = siblings[index - 1];
         siblings.RemoveAt(index);
         newParent.Children.Add(node.Task);
+        // expand new parent so moved node becomes visible
+        newParent.IsExpanded = true;
     }
 
     private void Outdent(TaskNode node)
@@ -341,6 +405,11 @@ else
         var grandParentList = grandParent?.Children ?? _currentProject.RootTasks;
         var parentIndex = grandParentList.IndexOf(parent);
         grandParentList.Insert(parentIndex + 1, node.Task);
+        // ensure grandparent is expanded so moved node is visible
+        if (grandParent is not null)
+        {
+            grandParent.IsExpanded = true;
+        }
     }
 
     private WbsTask? FindParent(WbsTask target)
@@ -370,6 +439,16 @@ else
         }
 
         return null;
+    }
+
+    private string PercentBgClass(decimal percent)
+    {
+        // red if > 100%, blue if > 75%, otherwise green
+        if (percent > 100m)
+            return "bg-danger text-white";
+        if (percent > 75m)
+            return "bg-primary text-white";
+        return "bg-success text-white";
     }
 
     private record TaskNode(WbsTask Task, WbsTask? Parent, int Depth);

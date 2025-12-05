@@ -19,7 +19,7 @@ public class WbsTask
         get => _charge;
         set => _charge = Math.Max(0, value);
     }
-        
+
     public decimal Consumed
     {
         get => _consumed;
@@ -36,7 +36,8 @@ public class WbsTask
 
     public List<WbsTask> Children { get; set; } = new();
 
-   
+    // UI state: expanded/collapsed in the tree view
+    public bool IsExpanded { get; set; } = true;
 
     public bool IsLeaf => Children.Count == 0;
 
