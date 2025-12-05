@@ -1,0 +1,41 @@
+html, body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.page {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    min-height: 100vh;
+}
+
+.sidebar {
+    background-color: #f5f5f5;
+    border-right: 1px solid #e0e0e0;
+    padding: 1rem;
+}
+
+.top-row {
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #fff;
+}
+
+.nav-link {
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.nav-link.active {
+    font-weight: bold;
+}
+
+.wbs-table th, .wbs-table td {
+    vertical-align: middle;
+}
+
+.indent-0 { padding-left: 0; }
+.indent-1 { padding-left: 1.5rem; }
+.indent-2 { padding-left: 3rem; }
+.indent-3 { padding-left: 4.5rem; }
+.indent-4 { padding-left: 6rem; }
+.indent-5 { padding-left: 7.5rem; }
+.indent-6 { padding-left: 9rem; }
