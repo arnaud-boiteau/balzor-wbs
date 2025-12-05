@@ -6,14 +6,13 @@ public class WbsTask
 
     public string Title { get; set; } = string.Empty;
 
-    public decimal Charge { get; set; }
+    public decimal Charge 
     {
         get => _charge;
         set => _charge = Math.Max(0, value);
     }
 
-    public decimal Consumed { get; set; }
-    {
+    public decimal Consumed {
         get => _consumed;
         set => _consumed = Math.Max(0, value);
     }
